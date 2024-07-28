@@ -73,35 +73,48 @@ if uploaded_file is not None:
     uploaded_image = Image.open(uploaded_file)
     st.image(uploaded_image, caption='Uploaded Image', use_column_width=True)
 
-    book_name = st.text_input("Enter the book name you want to search for").lower()
+    book_name = st.text_input("Input a single word to search for your book").lower()
     
     # Validate the book name input
     if " " in book_name:
         st.error("Please enter a single word without spaces.")
     else:
-        threshold = st.slider("Similarity threshold", 0.0, 1.0, 0.5)
+        # Predefined similarity threshold options
+        threshold_options = {
+            "Perfect Match (100%)": 1.0,
+            "Highly Similar (75%)": 0.75,
+            "Moderately Similar (50%)": 0.5,
+            "Less Similar (25%)": 0.25
+        }
+        
+        threshold_label = st.selectbox("Select Similarity Threshold", list(threshold_options.keys()))
+        threshold = threshold_options[threshold_label]
 
         if st.button("Find Book"):
             boxes = extract_text_and_boxes(uploaded_image)
-            text = " ".join([word.lower() for word in boxes['text']])
-            st.write("Extracted Text:")
-            st.write(text)
+            text = " ".join([word.lower() for word in boxes['text'] if word.strip() and boxes['conf'][boxes['text'].index(word)] != -1])
+            # st.write("Extracted Text:")
+            # st.write(text)
+
+            # Filter out text with confidence -1
+            valid_indices = [i for i, conf in enumerate(boxes['conf']) if conf != -1]
+            filtered_boxes = {key: [boxes[key][i] for i in valid_indices] for key in boxes.keys()}
 
             # Create a DataFrame to store the extracted text and their bounding boxes
             df = pd.DataFrame({
-                'Text': boxes['text'],
-                'Left': boxes['left'],
-                'Top': boxes['top'],
-                'Width': boxes['width'],
-                'Height': boxes['height'],
-                'Confidence': boxes['conf']
+                'Extracted Text Chunk': filtered_boxes['text'],
+                'Left': filtered_boxes['left'],
+                'Top': filtered_boxes['top'],
+                'Width': filtered_boxes['width'],
+                'Height': filtered_boxes['height'],
+                'Confidence': filtered_boxes['conf']
             })
 
             st.write("Extracted Text DataFrame:")
             st.write(df.head())
 
             # Draw bounding boxes around the detected text
-            image_with_boxes, found = draw_boxes(uploaded_image, boxes, book_name, threshold)
+            image_with_boxes, found = draw_boxes(uploaded_image, filtered_boxes, book_name, threshold)
             st.image(image_with_boxes, caption='Image with detected book name', use_column_width=True)
 
             if found:
