@@ -48,7 +48,9 @@ def calculate_similarity(s1, s2):
 # Function to draw bounding boxes and append text
 def draw_boxes(image, boxes, book_name, threshold):
     draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
+    font_path = "arial.ttf"  # Update this path to the location of your TrueType font file
+    font_size = 20  # Increase this value to make the text larger
+    font = ImageFont.truetype(font_path, font_size)
     found_texts = []
     found_indices = []
     for i in range(len(boxes['text'])):
@@ -65,6 +67,7 @@ def draw_boxes(image, boxes, book_name, threshold):
                 found_indices.append(i)
     return image, bool(found_texts), found_texts, found_indices
 
+
 st.set_page_config(page_title="BookSeekr", page_icon="📚")
 st.title("BookSeekr")
 
@@ -73,6 +76,10 @@ st.markdown("""
 ### Welcome to BookSeekr!
 BookSeekr helps you quickly locate and identify book titles from a picture of your bookshelf. Simply upload an image, rotate it for correct orientation, and search for a specific word in the book titles.
 """)
+
+# Initialize session state for threshold
+if 'threshold' not in st.session_state:
+    st.session_state.threshold = None
 
 # Sidebar for user inputs
 st.sidebar.header("User Inputs")
@@ -101,62 +108,59 @@ if uploaded_file is not None:
     if " " in book_name:
         st.error("Please enter a single word without spaces.")
     else:
-        # Predefined similarity threshold options as buttons
+        # Similarity threshold selection as a dropdown
         st.sidebar.subheader("Select Similarity Threshold")
         st.sidebar.write("""
         BookSeekr uses the Levenshtein Similarity Score to measure how similar two words are. 
         It calculates the number of single-character changes needed to turn one word into another. A higher score means the words are more alike.        
         """)
-        col1, col2, col3, col4 = st.sidebar.columns(4)
-        if col1.button("100%"):
-            threshold = 1.0
-        elif col2.button("75%"):
-            threshold = 0.75
-        elif col3.button("50%"):
-            threshold = 0.5
-        elif col4.button("25%"):
-            threshold = 0.25
-        else:
-            threshold = None
+        threshold_options = {
+            "Perfect Match (100%)": 1.0,
+            "High Match (75%)": 0.75,
+            "Moderate Match (50%)": 0.5,
+            "Low Match (25%)": 0.25
+        }
+        threshold_label = st.sidebar.selectbox("Select Similarity Threshold", list(threshold_options.keys()))
+        st.session_state.threshold = threshold_options[threshold_label]
 
-        if threshold is not None:
-            boxes = extract_text_and_boxes(rotated_image)
-            text = " ".join([word.lower() for word in boxes['text'] if word.strip()])
-            # st.write("Extracted Text:")
-            # st.write(text)
+        threshold = st.session_state.threshold
 
-            # Create a DataFrame to store the extracted text and their bounding boxes
-            df = pd.DataFrame({
-                'Extracted Text Chunk': boxes['text'],
-                'Left': boxes['left'],
-                'Top': boxes['top'],
-                'Width': boxes['width'],
-                'Height': boxes['height'],
-                'Confidence': boxes['conf']
-            })
+        if st.sidebar.button("Search Text"):
+            if threshold is not None:
+                boxes = extract_text_and_boxes(rotated_image)
+                text = " ".join([word.lower() for word in boxes['text'] if word.strip()])
 
-            # st.write("Extracted Text DataFrame:")
-            # st.write(df.head())
-
-            # Draw bounding boxes around the detected text
-            image_with_boxes, found, found_texts, found_indices = draw_boxes(rotated_image, boxes, book_name, threshold)
-            st.image(image_with_boxes, caption='Image with detected book name', use_column_width=True)
-
-            if found:
-                st.success(f"'{book_name}' found in the image.")
-                found_df = pd.DataFrame({
-                    'Found Text': [boxes['text'][i] for i in found_indices],
-                    'Left': [boxes['left'][i] for i in found_indices],
-                    'Top': [boxes['top'][i] for i in found_indices],
-                    'Width': [boxes['width'][i] for i in found_indices],
-                    'Height': [boxes['height'][i] for i in found_indices],
-                    'Confidence': [boxes['conf'][i] for i in found_indices]
+                # Create a DataFrame to store the extracted text and their bounding boxes
+                df = pd.DataFrame({
+                    'Extracted Text Chunk': boxes['text'],
+                    'Left': boxes['left'],
+                    'Top': boxes['top'],
+                    'Width': boxes['width'],
+                    'Height': boxes['height'],
+                    'Confidence': boxes['conf']
                 })
-                st.write("Found Text DataFrame:")
-                st.write(found_df)
-            else:
-                st.error(f"'{book_name}' not found in the image.")
 
-            # Save the DataFrame to a CSV file
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(label="Download CSV", data=csv, file_name='extracted_texts.csv', mime='text/csv')
+                # Draw bounding boxes around the detected text
+                image_with_boxes, found, found_texts, found_indices = draw_boxes(rotated_image, boxes, book_name, threshold)
+                st.image(image_with_boxes, caption='Image with detected book name', use_column_width=True)
+
+                if found:
+                    st.success(f"'{book_name}' found in the image.")
+                    found_df = pd.DataFrame({
+                        'Found Text': [boxes['text'][i] for i in found_indices],
+                        'Left': [boxes['left'][i] for i in found_indices],
+                        'Top': [boxes['top'][i] for i in found_indices],
+                        'Width': [boxes['width'][i] for i in found_indices],
+                        'Height': [boxes['height'][i] for i in found_indices],
+                        'Confidence': [boxes['conf'][i] for i in found_indices]
+                    })
+                    st.write("Found Text DataFrame:")
+                    st.write(found_df)
+                else:
+                    st.error(f"'{book_name}' not found in the image.")
+
+                # Save the DataFrame to a CSV file
+                csv = df.to_csv(index=False).encode('utf-8')
+                # st.download_button(label="Download CSV", data=csv, file_name='extracted_texts.csv', mime='text/csv')
+            else:
+                st.error("Please select a similarity threshold.")
