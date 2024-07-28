@@ -57,7 +57,7 @@ def draw_boxes(image, boxes, book_name, threshold):
             similarity = calculate_similarity(word, book_name.lower())
             if similarity >= threshold:
                 x, y, w, h = boxes['left'][i], boxes['top'][i], boxes['width'][i], boxes['height'][i]
-                draw.rectangle([x, y, x + w, y + h], outline="red", width=2)
+                draw.rectangle([x, y, x + w, y + h], outline="red", width=7)
                 coords_text = f"({x},{y})"
                 draw.text((x, y - 20), coords_text, fill="blue", font=font)  # Append coordinates above bounding box
                 draw.text((x, y - 10), word, fill="red", font=font)  # Append text above bounding box
@@ -88,15 +88,11 @@ if uploaded_file is not None:
     uploaded_image = Image.open(uploaded_file)
     st.image(uploaded_image, caption='Uploaded Image', width=300)
 
-    # Slider and numeric input to select the rotation angle
+    # Numeric input to select the rotation angle
     st.sidebar.subheader('Rotate Image')
     st.sidebar.write("Rotate the image to ensure the English words are in the correct orientation.")
-    angle = st.sidebar.slider("Rotate image", 0, 360, 0)
-    angle_input = st.sidebar.number_input("Or input rotation angle", min_value=0, max_value=360, value=angle)
-    
-    if angle_input != angle:
-        angle = angle_input
-    
+    angle = st.sidebar.number_input("Input rotation angle", min_value=0, max_value=360, value=0)
+
     rotated_image = rotate_image(uploaded_image, angle)
     st.image(rotated_image, caption='Rotated Image', use_column_width=True)
 
@@ -158,6 +154,6 @@ if uploaded_file is not None:
 
                 # Save the DataFrame to a CSV file
                 csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(label="Download CSV", data=csv, file_name='extracted_texts.csv', mime='text/csv')
+                # st.download_button(label="Download CSV", data=csv, file_name='extracted_texts.csv', mime='text/csv')
             else:
                 st.error("Please select a similarity threshold.")
