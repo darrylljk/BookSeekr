@@ -50,24 +50,26 @@ def draw_boxes(image, boxes, book_name, threshold):
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     found_texts = []
+    found_indices = []
     for i in range(len(boxes['text'])):
         word = boxes['text'][i].strip().lower()
         if word:
             similarity = calculate_similarity(word, book_name.lower())
             if similarity >= threshold:
                 x, y, w, h = boxes['left'][i], boxes['top'][i], boxes['width'][i], boxes['height'][i]
-                draw.rectangle([x, y, x + w, y + h], outline="red", width=8)
+                draw.rectangle([x, y, x + w, y + h], outline="red", width=10)
                 draw.text((x, y - 10), word, fill="red", font=font)  # Append text above bounding box
                 found_texts.append(word)
-    return image, bool(found_texts), found_texts
+                found_indices.append(i)
+    return image, bool(found_texts), found_texts, found_indices
 
 st.set_page_config(page_title="BookSeekr", page_icon="📚")
 st.title("BookSeekr")
 
-# Explanation of Levenshtein similarity
+# Introduction to BookSeekr
 st.markdown("""
-#### Levenshtein Similarity Score
-The Levenshtein similarity score measures how similar two strings are by calculating the minimum number of single-character edits required to change one word into the other. A higher score indicates more similarity.
+### Welcome to BookSeekr!
+BookSeekr helps you quickly locate and identify book titles from a picture of your bookshelf. Simply upload an image, rotate it for correct orientation, and search for a specific word in the book titles.
 """)
 
 # Upload image
@@ -77,8 +79,14 @@ if uploaded_file is not None:
     uploaded_image = Image.open(uploaded_file)
     st.image(uploaded_image, caption='Uploaded Image', use_column_width=True)
 
-    # Slider to select the rotation angle
-    angle = st.slider("Rotate the image to correct orientation", 0, 360, 0)
+    # Slider and numeric input to select the rotation angle
+    st.write("Rotate the image to ensure the English words are in the correct orientation.")
+    angle = st.slider("Rotate image", 0, 360, 0)
+    angle_input = st.number_input("Or input rotation angle", min_value=0, max_value=360, value=angle)
+    
+    if angle_input != angle:
+        angle = angle_input
+    
     rotated_image = rotate_image(uploaded_image, angle)
     st.image(rotated_image, caption='Rotated Image', use_column_width=True)
 
@@ -89,22 +97,24 @@ if uploaded_file is not None:
         st.error("Please enter a single word without spaces.")
     else:
         # Predefined similarity threshold options as buttons
-        st.write("Select Similarity Threshold")
+        st.subheader("Select Similarity Threshold")
+        st.write("""
+        BookSeekr uses the Levenshtein Similarity Score to measure how similar two words are. 
+        It calculates the number of single-character changes needed to turn one word into another. A higher score means the words are more alike.        
+        """)
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("Perfect Match (100%)"):
-                threshold = 1.0
-        with col2:
-            if st.button("Highly Similar (75%)"):
-                threshold = 0.75
-        with col3:
-            if st.button("Moderately Similar (50%)"):
-                threshold = 0.5
-        with col4:
-            if st.button("Less Similar (25%)"):
-                threshold = 0.25
+        if col1.button("100%"):
+            threshold = 1.0
+        elif col2.button("75%"):
+            threshold = 0.75
+        elif col3.button("50%"):
+            threshold = 0.5
+        elif col4.button("25%"):
+            threshold = 0.25
+        else:
+            threshold = None
 
-        if 'threshold' in locals():
+        if threshold is not None:
             boxes = extract_text_and_boxes(rotated_image)
             text = " ".join([word.lower() for word in boxes['text'] if word.strip()])
             # st.write("Extracted Text:")
@@ -120,17 +130,22 @@ if uploaded_file is not None:
                 'Confidence': boxes['conf']
             })
 
-            st.write("Extracted Text DataFrame:")
-            st.write(df.head())
+            # st.write("Extracted Text DataFrame:")
+            # st.write(df.head())
 
             # Draw bounding boxes around the detected text
-            image_with_boxes, found, found_texts = draw_boxes(rotated_image, boxes, book_name, threshold)
+            image_with_boxes, found, found_texts, found_indices = draw_boxes(rotated_image, boxes, book_name, threshold)
             st.image(image_with_boxes, caption='Image with detected book name', use_column_width=True)
 
             if found:
                 st.success(f"'{book_name}' found in the image.")
                 found_df = pd.DataFrame({
-                    'Found Text': found_texts
+                    'Found Text': [boxes['text'][i] for i in found_indices],
+                    'Left': [boxes['left'][i] for i in found_indices],
+                    'Top': [boxes['top'][i] for i in found_indices],
+                    'Width': [boxes['width'][i] for i in found_indices],
+                    'Height': [boxes['height'][i] for i in found_indices],
+                    'Confidence': [boxes['conf'][i] for i in found_indices]
                 })
                 st.write("Found Text DataFrame:")
                 st.write(found_df)
@@ -139,6 +154,4 @@ if uploaded_file is not None:
 
             # Save the DataFrame to a CSV file
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(label="Download CSV", data=csv, file_name='extracted_texts.csv', mime='text/csv')
-        else:
-            st.write("Please select a similarity threshold.")
+            # st.download_button(label="Download CSV", data=csv, file_name='extracted_texts.csv', mime='text/csv')
