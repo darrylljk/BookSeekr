@@ -7,8 +7,8 @@ import numpy as np
 import Levenshtein
 import pandas as pd
 
-# Ensure pytesseract knows the location of the tesseract executable
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Ensure pytesseract knows the location of the tesseract executable // uncomment if running locally
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Function to load the image from a directory
 def load_image(image_path):
